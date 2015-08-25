@@ -59,6 +59,75 @@ void exAnalysis() {
 }
 #endif
 
+std::vector<std::pair<double,int> > AngleCombinations(double distance = 110., bool folding = false) {
+   std::vector<std::pair<double,int> > result;
+   std::vector<std::pair<double,int> > grouped_result;
+   std::vector<double> angle;
+   for(int firstDet = 1; firstDet <= 12; ++firstDet) {
+      for(int firstCry = 0; firstCry < 4; ++firstCry) {
+         for(int secondDet = 1; secondDet <= 12; ++secondDet) {
+            for(int secondCry = 0; secondCry < 4; ++secondCry) {
+               if(firstDet == secondDet && firstCry == secondCry) {
+                  continue;
+               }
+               angle.push_back(TGriffin::GetPosition(firstDet, firstCry, distance).Angle(TGriffin::GetPosition(secondDet, secondCry, distance))*180./TMath::Pi());
+              // if(folding && angle.back() > 90.) {
+              //                 //  angle.back() = 180. - angle.back();
+              //                               // }
+              //                                             // std::cout<<firstDet<<", "<<firstCry<<" - "<<secondDet<<", "<<secondCry<<": "<<angle.back()<<std::endl;
+               }
+            }
+        }
+   }
+
+   std::sort(angle.begin(),angle.end());
+   size_t r;
+   for(size_t a = 0; a < angle.size(); ++a) {
+      for(r = 0; r < result.size(); ++r) {
+         if(angle[a] >= result[r].first-0.001 && angle[a] <= result[r].first+0.001) {
+            (result[r].second)++;
+            break;
+         }
+      }
+      if(result.size() == 0 || r == result.size()) {
+         result.push_back(std::make_pair(angle[a],1));
+      }
+   }
+
+   if(folding) {//if we fold we also want to group
+     std::vector<std::pair<double,int> > groupedResult;
+     for(size_t i = 0, r = 0; i < result.size(); ++i) {
+       switch(i) {
+       case 0:
+       case 1:
+         groupedResult.push_back(result[i]);
+         break;
+       case 2:
+       case 4:
+       case 6:
+         if(i+1 >= result.size()) {
+           std::cerr<<"Error!"<<std::endl;
+         }
+         groupedResult.push_back(std::make_pair((result[i].first+result[i+1].first)/2.,result[i].second+result[i+1].second));
+         ++i;
+         break;
+       default:
+         groupedResult.push_back(std::make_pair((result[i].first+result[i+1].first+result[i+2].first)/3.,result[i].second+result[i+1].second+result[i+2].second));
+         i+=2;
+         break;
+       }
+     }
+     return groupedResult;
+   }
+
+                 return result;
+
+}
+
+
+
+
+
 TList *exAnalysis(TTree* tree, long maxEntries = 0, TStopwatch* w = NULL) {
 
    ///////////////////////////////////// SETUP ///////////////////////////////////////
@@ -88,6 +157,23 @@ TList *exAnalysis(TTree* tree, long maxEntries = 0, TStopwatch* w = NULL) {
 
    const size_t MEM_SIZE = (size_t)1024*(size_t)1024*(size_t)1024*(size_t)8; // 8 GB
 
+   std::vector<std::pair<double,int> > angleCombinations = AngleCombinations(110., false);
+   std::cout<<"got "<<angleCombinations.size()<<" angles"<<std::endl;
+   for(auto ang = angleCombinations.begin(); ang != angleCombinations.end(); ang++) {
+      std::cout<<(*ang).first<<" degree: "<<(*ang).second<<" combinations"<<std::endl;
+   }
+
+   double* xBins = new double[1501];
+   double* yBins = new double[1501];
+   for(int i = 0; i <= 1500; ++i) {
+      xBins[i] = (double) i;
+      yBins[i] = (double) i;
+   }
+
+   double* zBins = new double[angleCombinations.size()+1];
+   for(int i = 0; i<=52; i++){
+        zBins[i] = (double) i;
+   }
    //We create some spectra and then add it to the list
    TH1F* gammaSingles = new TH1F("gammaSingles","#gamma singles;energy[keV]",nofBins, low, high); list->Add(gammaSingles);
    TH1F* gammaSinglesB = new TH1F("gammaSinglesB","#beta #gamma;energy[keV]",nofBins, low, high); list->Add(gammaSinglesB);
@@ -103,6 +189,20 @@ TList *exAnalysis(TTree* tree, long maxEntries = 0, TStopwatch* w = NULL) {
    TH2F* gammaSinglesB_hp = new TH2F("gammaSinglesB_hp", "#gamma-#beta vs. SC channel", nofBins,low,high,20,1,21); list->Add(gammaSinglesB_hp);
    TH2F* ggbmatrix = new TH2F("ggbmatrix","#gamma-#gamma-#beta matrix", nofBins, low, high, nofBins, low, high); list->Add(ggbmatrix);
    TH2F* ggbmatrixt = new TH2F("ggbmatrixt","#gamma-#gamma-#beta matrix t-corr", nofBins, low, high, nofBins, low, high); list->Add(ggbmatrixt);
+   TH2F* ggEcosTheta1408 = new TH2F("ggEcosTheta1408","#gamma-#gamma Energy cosTheta index ", 5200, low, 2600, 52, low, 51); list->Add(ggEcosTheta1408);
+   TH2F* ggEcosTheta1112 = new TH2F("ggEcosTheta1112","#gamma-#gamma Energy cosTheta index ", 5200, low, 2600, 52, low, 51); list->Add(ggEcosTheta1112);
+   TH2F* ggEcosTheta964 = new TH2F("ggEcosTheta964","#gamma-#gamma Energy cosTheta index ", 5200, low, 2600, 52, low, 51); list->Add(ggEcosTheta964);
+   TH2F* ggEcosTheta778 = new TH2F("ggEcosTheta778","#gamma-#gamma Energy cosTheta index ", 5200, low, 2600, 52, low, 51); list->Add(ggEcosTheta778);
+   TH2F* ggEcosTheta1089 = new TH2F("ggEcosTheta1089","#gamma-#gamma Energy cosTheta index ", 5200, low, 2600, 52, low, 51); list->Add(ggEcosTheta1089);
+   TH2F* ggEcosTheta411 = new TH2F("ggEcosTheta411","#gamma-#gamma Energy cosTheta index ", 5200, low, 2600, 52, low, 51); list->Add(ggEcosTheta411);
+   TH2F *ggEcosThetaIso = new TH2F("ggEcosThetaIso","#gamma-#gamma Energy cosTheta Isotropic", 5200, low, 2600, 52, low, 51); list->Add(ggEcosThetaIso);
+   TH2F* ggmatrixIndex[52];
+   TH2F* ggmatrixIndexIso[52];
+   for(int i = 0; i <51; i++){
+        ggmatrixIndex[i] = new TH2F(Form("ggmatrixIndex_%d",i),Form("#gamma-#gamma Energy cosTheta index %d",i), 5200, low, 2600, 5200, low, 2600); list->Add(ggmatrixIndex[i]);
+        ggmatrixIndexIso[i] = new TH2F(Form("ggmatrixIndexIso_%d",i),Form("#gamma-#gamma Energy cosTheta Isotropic index %d",i), 5200, low, 2600, 5200, low, 2600); list->Add(ggmatrixIndexIso[i]);
+   }
+   TH3F* angCorr_coinc_Binned = new TH3F("angCorr_coinc_Binned","angular correlation cube;energy [keV];energy [keV];angle [^{o}]", 1500, xBins, 1500, yBins, angleCombinations.size(), zBins); list->Add(angCorr_coinc_Binned);
    TH2F* grifscep_hp = new TH2F("grifscep_hp","Sceptar vs Griffin hit pattern",64,0,64,20,0,20); list->Add(grifscep_hp);
    TH2F* gbTimevsg = new TH2F("gbTimevsg","#gamma energy vs. #gamma-#beta timing",300,-150,150,nofBins,low,high); list->Add(gbTimevsg); 
    TH2F* gammaSinglesCyc = new TH2F("gammaSinglesCyc", "Cycle time vs. #gamma energy", 25000.,0.,25000., 4500,low,4500); list->Add(gammaSinglesCyc);
@@ -131,7 +231,8 @@ TList *exAnalysis(TTree* tree, long maxEntries = 0, TStopwatch* w = NULL) {
    //These are the indices of the two hits being compared
    int one;
    int two;
-
+   int three;
+   int index = 0;
    std::cout<<std::fixed<<std::setprecision(1); //This just make outputs not look terrible
    int entry;
    size_t angIndex;
@@ -140,13 +241,38 @@ TList *exAnalysis(TTree* tree, long maxEntries = 0, TStopwatch* w = NULL) {
    }
    for(entry = 1; entry < maxEntries; ++entry) { //Only loop over the set number of entries
                                                  //I'm starting at entry 1 because of the weird high stamp of 4.
-      tree->GetEntry(entry);
+      bool iso_flag = false;
+      if(entry > 2)tree->GetEntry(entry-2);
+        if(grif->GetMultiplicity()>1)
+                iso_flag = true;
+
+      TGriffin* grif2 = (TGriffin*)(grif->Clone()); 
+     tree->GetEntry(entry);
       
       //loop over the gammas in the event packet
       //grif is the variable which points to the current TGriffin
       for(one = 0; one < (int) grif->GetMultiplicity(); ++one) {
          //We want to put every gamma ray in this event into the singles
          gammaSingles->Fill(grif->GetGriffinHit(one)->GetEnergy()); 
+              for(three = 0; three < (int) grif2->GetMultiplicity(); ++three) {
+                   double ang2 = grif->GetGriffinHit(one)->GetPosition().Angle(grif2->GetGriffinHit(three)->GetPosition())*180./TMath::Pi();
+                         for(int i = 0; i < 52; i++){
+                                if(ang2 >= angleCombinations[i].first - 0.0005 && ang2 <= angleCombinations[i].first + 0.0005){
+                                        ggmatrixIndexIso[i]->Fill(grif->GetGriffinHit(one)->GetEnergy(),grif2->GetGriffinHit(three)->GetEnergy());
+                                        if(grif->GetGriffinHit(one)->GetEnergy() > 1405.5 && grif->GetGriffinHit(one)->GetEnergy() < 1411.5){
+                                                 if(iso_flag && grif2->GetMultiplicity() > 0.){
+                                                         ggEcosThetaIso->Fill(grif2->GetGriffinHit(three)->GetEnergy(), i);
+                                                }//TMath::Cos(TMath::DegToRad()*ang));
+                                                 }
+                                              //   if(grif2->GetGriffinHit(three)->GetEnergy() < 1334.5 && grif2->GetGriffinHit(three)->GetEnergy() > 1330.5){
+                                                //        if(iso_flag && grif2->GetMultiplicity() > 0.){
+                                                  //              ggEcosThetaIso->Fill(grif->GetGriffinHit(one)->GetEnergy(), i);
+                                               // }//TMath::Cos(TMath::DegToRad()*ang));
+                                                  //      }
+                                                        break;
+                                                   }
+                                        }
+              }         
          gtimestamp->Fill(grif->GetGriffinHit(one)->GetTime()/100000000.);
          Long_t time = (Long_t)(grif->GetHit(one)->GetTime());
     //     time = time%2268500000L;
@@ -157,6 +283,50 @@ TList *exAnalysis(TTree* tree, long maxEntries = 0, TStopwatch* w = NULL) {
             if(two == one){ //If we are looking at the same gamma we don't want to call it a coincidence
                continue;
             }
+	    double ang = grif->GetGriffinHit(one)->GetPosition().Angle(grif->GetGriffinHit(two)->GetPosition())*180./TMath::Pi();
+            for(angIndex = 0; angIndex < angleCombinations.size(); ++angIndex) {
+                if(TMath::Abs(ang - angleCombinations[angIndex].first) < 1.0) {
+                  break;
+               }
+            }
+            if(ggTlow <= TMath::Abs(grif->GetGriffinHit(two)->GetTime()-grif->GetGriffinHit(one)->GetTime()) && TMath::Abs(grif->GetGriffinHit(two)->GetTime()-grif->GetGriffinHit(one)->GetTime()) < ggThigh) {
+               for(int i = 0; i < 52; i++){
+                   if(ang >= angleCombinations[i].first - 0.0005 && ang <= angleCombinations[i].first + 0.0005){
+                     index = i;
+                     angCorr_coinc_Binned->Fill(grif->GetGriffinHit(one)->GetEnergy(),grif->GetGriffinHit(two)->GetEnergy(),(double) index,1.);
+                        break;
+                   }
+               }
+                for(int i = 0; i < 52; i++){
+                   if((ang >= (angleCombinations[i].first - 0.0005)) && (ang <= (angleCombinations[i].first + 0.0005))){
+                        ggmatrixIndex[i]->Fill(grif->GetGriffinHit(one)->GetEnergy(),grif->GetGriffinHit(two)->GetEnergy());
+                        if(grif->GetGriffinHit(one)->GetEnergy() > 1405.5 && grif->GetGriffinHit(one)->GetEnergy() < 1411.5){
+                                ggEcosTheta1408->Fill(grif->GetGriffinHit(two)->GetEnergy(), i);//TMath::Cos(TMath::DegToRad()*ang));
+                        }
+                        if(grif->GetGriffinHit(one)->GetEnergy() > 1108.5 && grif->GetGriffinHit(one)->GetEnergy() < 1115.5){
+                                ggEcosTheta1112->Fill(grif->GetGriffinHit(two)->GetEnergy(), i);//TMath::Cos(TMath::DegToRad()*ang));
+                        }
+                        if(grif->GetGriffinHit(one)->GetEnergy() > 960.5 && grif->GetGriffinHit(one)->GetEnergy() < 967.5){
+                                ggEcosTheta964->Fill(grif->GetGriffinHit(two)->GetEnergy(), i);//TMath::Cos(TMath::DegToRad()*ang));
+                        }
+                        if(grif->GetGriffinHit(one)->GetEnergy() > 774.5 && grif->GetGriffinHit(one)->GetEnergy() < 782.5){
+                                ggEcosTheta778->Fill(grif->GetGriffinHit(two)->GetEnergy(), i);//TMath::Cos(TMath::DegToRad()*ang));
+                        }
+                        if(grif->GetGriffinHit(one)->GetEnergy() > 1085.5 && grif->GetGriffinHit(one)->GetEnergy() < 1093.5){
+                                ggEcosTheta1089->Fill(grif->GetGriffinHit(two)->GetEnergy(), i);//TMath::Cos(TMath::DegToRad()*ang));
+                        }
+                        if(grif->GetGriffinHit(one)->GetEnergy() > 407.5 && grif->GetGriffinHit(one)->GetEnergy() < 414.5){
+                                ggEcosTheta411->Fill(grif->GetGriffinHit(two)->GetEnergy(), i);//TMath::Cos(TMath::DegToRad()*ang));
+			 }
+                      //  if(grif->GetGriffinHit(two)->GetEnergy() < 1334.5 && grif->GetGriffinHit(two)->GetEnergy() > 1330.5){
+                         //       ggEcosTheta->Fill(grif->GetGriffinHit(one)->GetEnergy(), i);//TMath::Cos(TMath::DegToRad()*ang));
+
+                      //  }
+                        break;
+
+                      }
+                    }
+               }
             //Check to see if the two gammas are close enough in time
             ggTimeDiff->Fill(TMath::Abs(grif->GetGriffinHit(two)->GetTime()-grif->GetGriffinHit(one)->GetTime()));
             if(ggTlow <= TMath::Abs(grif->GetGriffinHit(two)->GetTime()-grif->GetGriffinHit(one)->GetTime()) && TMath::Abs(grif->GetGriffinHit(two)->GetTime()-grif->GetGriffinHit(one)->GetTime()) < ggThigh) { 
@@ -289,7 +459,7 @@ int main(int argc, char **argv) {
       }
       int runnumber = runinfo->RunNumber();
       int subrunnumber = runinfo->SubRunNumber();
-      outfile = new TFile(Form("matrix%05d_%03d.root",runnumber,subrunnumber),"recreate");
+      outfile = new TFile(Form("Leanmatrix%05d_%03d.root",runnumber,subrunnumber),"recreate");
    }
    else
    {
